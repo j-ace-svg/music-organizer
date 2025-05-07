@@ -58,8 +58,11 @@ def load_library_manifest():
 def main(parser=argparse.ArgumentParser()):
     print(__TITLE__)
 
-    
+    parser.add_argument("--verbose-manifest", action="store_true", help="display a parsed version of the library manifest")
     args = parser.parse_args()
+
+    if args.verbose_manifest:
+        print(load_library_manifest())
 
 if __name__ == "__main__":
     main()
