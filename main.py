@@ -2,7 +2,9 @@
 import argparse
 import os
 from pathlib import Path
+import toml
 import appdirs
+import yt_dlp
 
 __TITLE__ = "Music Organizer"
 
@@ -24,6 +26,17 @@ def gen_config_schema():
         "manifest-path": {
             "type": Path,
             "default": Path.home() / "Music" / ".libman",
+        },
+        "yt-dlp": {
+            "type": "optional",
+            "default": {
+                "quiet": True,
+                "postprocessors": [
+                    {
+                        "key": "FFmpegExtractAudio",
+                    }
+                ]
+            },
         },
     }
 
@@ -52,6 +65,14 @@ def load_config(config_path = Path(appdirs.user_config_dir("music-organizer")) /
         process_sublevel(full_config, config_schema, config_file_dict)
 
         return full_config
+
+def gen_youtube_downloader_outpath(config, path):
+    yt_opts = config["yt-dlp"]
+    yt_opts["outtmpl"] = str(path)
+
+    downloader = yt_dlp.YoutubeDL(yt_opts)
+
+    return downloader
 
 def load_library_manifest(config):
     indent_size = 2
@@ -104,11 +125,29 @@ def load_library_manifest(config):
 
         return process_sublevel(current_line, 0)
 
+def pull_missing_songs(config):
+    manifest = load_library_manifest(config)
+
+    def process_sublevel(current_directory, path_prefix):
+        for key in current_directory:
+            subpath = path_prefix / key["name"]
+            if key["directory"]:
+                if not os.path.isdir(subpath):
+                    os.mkdir(subpath)
+                process_sublevel(key["value"], subpath)
+            else:
+                if not os.path.isfile(subpath):
+                    downloader = gen_youtube_downloader_outpath(config, subpath)
+                    downloader.download(key["value"])
+
+    process_sublevel(manifest, config["library-path"])
+
 def main(parser=argparse.ArgumentParser()):
     print(__TITLE__)
 
     parser.add_argument("--config", type=dir_path, help="override the default config path")
     parser.add_argument("--verbose-manifest", action="store_true", help="display a parsed version of the library manifest")
+    parser.add_argument("--pull-missing", action="store_true", help="populate missing songs in library")
     args = parser.parse_args()
 
     if args.config:
@@ -119,6 +158,9 @@ def main(parser=argparse.ArgumentParser()):
 
     if args.verbose_manifest:
         print(load_library_manifest(config))
+
+    if args.pull_missing:
+        pull_missing_songs(config)
 
 if __name__ == "__main__":
     main()

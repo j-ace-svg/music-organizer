@@ -17,6 +17,7 @@
       myPythonWithPackages = myPython.withPackages (ps: with ps; [
         yt-dlp
         appdirs
+        toml
       ]);
     in
     {
