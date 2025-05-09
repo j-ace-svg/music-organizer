@@ -7,6 +7,7 @@ import appdirs
 import yt_dlp
 
 __TITLE__ = "Music Organizer"
+__TITLE_TECHNICAL__ = "music-organizer"
 
 def dir_path(path):
     """
@@ -31,6 +32,7 @@ def gen_config_schema():
             "type": "optional",
             "default": {
                 "quiet": True,
+                "no_warnings": True,
                 "postprocessors": [
                     {
                         "key": "FFmpegExtractAudio",
@@ -40,7 +42,7 @@ def gen_config_schema():
         },
     }
 
-def load_config(config_path = Path(appdirs.user_config_dir("music-organizer")) / "config.toml"):
+def load_config(config_path = Path(appdirs.user_config_dir(__TITLE_TECHNICAL__)) / "config.toml"):
     with open(config_path) as config_file:
         config_file_dict = toml.load(config_file)
         config_schema = gen_config_schema()
@@ -146,15 +148,15 @@ def main(parser=argparse.ArgumentParser()):
     print(__TITLE__)
 
     parser.add_argument("--config", type=dir_path, help="override the default config path")
+    parser.add_argument("-v", "--verbose", action="store_true", help="print debugging information")
     parser.add_argument("--verbose-manifest", action="store_true", help="display a parsed version of the library manifest")
-    parser.add_argument("--pull-missing", action="store_true", help="populate missing songs in library")
+    parser.add_argument("-p", "--pull-missing", action="store_true", help="populate missing songs in library")
     args = parser.parse_args()
 
     if args.config:
         config = load_config(args.config)
     else:
         config = load_config()
-    print(config)
 
     if args.verbose_manifest:
         print(load_library_manifest(config))
