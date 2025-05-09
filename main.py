@@ -1,13 +1,62 @@
 #!/usr/bin/env python
 import argparse
+import os
 from pathlib import Path
+import appdirs
 
 __TITLE__ = "Music Organizer"
 
-def load_library_manifest():
+def dir_path(path):
+    """
+    Validate a CLI path argument
+    """
+    if os.path.isdir(path):
+        return path
+    else:
+        raise NotADirectoryError(path)
+
+def gen_config_schema():
+    return {
+        "library-path": {
+            "type": Path,
+            "default": Path.home() / "Music",
+        },
+        "manifest-path": {
+            "type": Path,
+            "default": Path.home() / "Music" / ".libman",
+        },
+    }
+
+def load_config(config_path = Path(appdirs.user_config_dir("music-organizer")) / "config.toml"):
+    with open(config_path) as config_file:
+        config_file_dict = toml.load(config_file)
+        config_schema = gen_config_schema()
+        full_config = {}
+
+        def process_sublevel(full_config_category, config_schema_category, config_file_category):
+            for key in set(config_file_category) | set(config_schema_category):
+                if not key in config_schema_category:
+                    raise AttributeError(key)
+
+                if config_schema_category[key]["type"] == dict:
+                    full_config_category[key] = {}
+                    process_sublevel(full_config_category[key], config_schema_category[key]["value"], config_file_category[key])
+                else:
+                    if not key in config_file_category:
+                        full_config_category[key] = config_schema_category[key]["default"]
+                    elif config_schema_category[key]["type"] == Path:
+                        full_config_category[key] = Path.expanduser(Path(config_file_category[key]))
+                    else:
+                        full_config_category[key] = config_file_category[key]
+
+        process_sublevel(full_config, config_schema, config_file_dict)
+
+        return full_config
+
+def load_library_manifest(config):
     indent_size = 2
 
-    with open(Path.home() / "Music" / ".libman") as manifest:
+    with open(config["manifest-path"]) as manifest:
         indent_level = 0
         current_line = manifest.readline()
         assert(current_line[:2] != "- ")
@@ -58,11 +107,18 @@ def load_library_manifest():
 def main(parser=argparse.ArgumentParser()):
     print(__TITLE__)
 
+    parser.add_argument("--config", type=dir_path, help="override the default config path")
     parser.add_argument("--verbose-manifest", action="store_true", help="display a parsed version of the library manifest")
     args = parser.parse_args()
 
+    if args.config:
+        config = load_config(args.config)
+    else:
+        config = load_config()
+    print(config)
+
     if args.verbose_manifest:
-        print(load_library_manifest())
+        print(load_library_manifest(config))
 
 if __name__ == "__main__":
     main()
